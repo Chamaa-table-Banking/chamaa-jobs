@@ -5,9 +5,9 @@ import { RedisQueues, connectRedis } from '../functions/queue.js';
 dotenv.config();
 
 const depositQueue = 'queue:shortcode:worker';
-const STK_STATUS_API = 'http://localhost:4500/api/v1/payments/stk/response/status';
-const PAYMENT_IN_API = 'http://localhost:4000/api/v1/payments/in';
-const WALLET_CREDIT_API = 'http://localhost:4000/api/v1/wallet/'
+const STK_STATUS_API = 'https://chamaa-gateway.onrender.com/api/v1/payments/stk/response/status';
+const PAYMENT_IN_API = 'https://mpesa-2-0-plugins.onrender.com/api/v1/payments/in';
+const WALLET_CREDIT_API = 'https://mpesa-2-0-plugins.onrender.com/api/v1/wallet/'
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '1000', 10); // Default 15 seconds
 
 connectRedis();
