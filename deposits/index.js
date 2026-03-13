@@ -76,6 +76,7 @@ const processQueueItem = async (data) => {
         "chamaa_id": chamaDetails.id,
         "user_id": data.user_id,
         "cycle_id": "null",
+        "transaction_type": "deposit",
         "date": parseCustomDate(`${transactionDate}`)
     }
 
