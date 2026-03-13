@@ -5,11 +5,16 @@ import { RedisQueues, connectRedis } from '../functions/queue.js';
 dotenv.config();
 
 const depositQueue = 'queue:shortcode:worker';
-const STK_STATUS_API = 'https://chamaa-gateway.onrender.com/api/v1/payments/stk/response/status';
-const PAYMENT_IN_API = 'https://mpesa-2-0-plugins.onrender.com/api/v1/payments/in';
-const WALLET_CREDIT_API = 'https://mpesa-2-0-plugins.onrender.com/api/v1/wallet/'
+const STK_STATUS_API = `${process.env.gateway}/api/v1/payments/stk/response/status`
+const PAYMENT_IN_API = `${process.env.mpesa_ms_url}/payments/in`;
+const WALLET_CREDIT_API = `${process.env.mpesa_ms_url}/wallet/`
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '1000', 10); // Default 15 seconds
-
+console.log('Worker configuration:', {
+    STK_STATUS_API,
+    PAYMENT_IN_API,
+    WALLET_CREDIT_API,
+    POLL_INTERVAL_MS,
+});
 connectRedis();
 
 /**
