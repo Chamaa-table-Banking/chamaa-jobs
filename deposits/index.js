@@ -4,6 +4,7 @@ import { RedisQueues, connectRedis } from '../functions/queue.js';
 dotenv.config();
 
 const depositQueue = 'queue:shortcode:worker';
+const depositRetryQueue = 'queue:shortcode:worker:retry';
 const STK_STATUS_API = `${process.env.gateway}/api/v1/payments/stk/response/status`
 const PAYMENT_IN_API = `${process.env.mpesa_ms_url}/payments/in`;
 const WALLET_CREDIT_API = `${process.env.mpesa_ms_url}/wallet/`
@@ -137,15 +138,19 @@ const pollQueue = async () => {
                     const data = await RedisQueues.popRightFromQueue(depositQueue);
                     if (data) {
                         d = data
-                        await processQueueItem(data)
+                        const response = await processQueueItem(data)
+                        if(response ==false){
+                            console.log("Pushing data retry Queue")
+                            await RedisQueues.addToQueue(depositRetryQueue, d)
+                        }
                     }
                     console.log('No data retrieved from queue item, skipping...');
 
                 } catch (itemError) {
                     console.error('Error processing queue item:', itemError)
                     console.log(d)
-                    await RedisQueues.addToQueue(depositQueue, d)
-                    console.log('Returned item to queue')
+                    await RedisQueues.addToQueue(depositRetryQueue, d)
+                    console.log('Pushed Item to retry Queue')
                     // Continue with next item instead of breaking
                 }
             
@@ -158,13 +163,41 @@ const pollQueue = async () => {
 /**
  * Starts the queue worker with configurable interval
  */
-const startWorker = () => {
-    console.log(`Starting queue worker with ${POLL_INTERVAL_MS}ms interval...`);
+const retryQueue = async () => {
+     try {
+        let queueLength = await RedisQueues.queueLength(depositRetryQueue);
+        console.log(`Queue length: ${queueLength}`);
 
-    // Run immediately on start
-    pollQueue();
 
-    // Then run at configured interval
+        if (queueLength> 0) {
+            console.log(`Processing ${queueLength} item(s) from queue...`);
+                let d
+                try {
+                    const data = await RedisQueues.popRightFromQueue(depositRetryQueue);
+                    if (data) {
+                        d = data
+                        const response = await processQueueItem(data)
+                        if(response ==false){
+                            console.log("Pushing data retry Queue")
+                            await RedisQueues.addToQueue(depositRetryQueue, d)
+                        }
+                    }
+                    console.log('No data retrieved from queue item, skipping...');
+
+                } catch (itemError) {
+                    console.error('Error processing queue item:', itemError)
+                    console.log(d)
+                    await RedisQueues.addToQueue(depositRetryQueue, d)
+                    console.log('Pushed Item to retry Queue')
+                    // Continue with next item instead of breaking
+                }
+            
+        }
+    } catch (error) {
+        console.error('Error polling queue:', error);
+    }
 };
 // startWorker();
 setInterval(pollQueue, POLL_INTERVAL_MS);
+setInterval(retryQueue, 15000);
+
