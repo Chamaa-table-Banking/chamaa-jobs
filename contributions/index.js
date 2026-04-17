@@ -209,11 +209,15 @@ const processContributions = async () => {
                     for (const member of status.insufficientBalanceMembers) {
                         //send notification to the user about insufficient balance, 
                         await RedisQueues.addToQueue(sms_notification_queue, {
-                            type: 'insufficient_balance',
-                            user_id: member.user_id,
-                            chamaa_id: member.chamaa_id,
-                            available_balance: member.available_balance,
-                            expected_amount: member.expected_amount
+                            type: 'financial_reminder',
+                            data:{
+                                type: 'insufficient_balance',
+                                user_id: member.user_id,
+                                chamaa_id: member.chamaa_id,
+                                cycle_id: status.cycle_id,
+                                available_balance: member.available_balance,
+                                expected_amount: member.expected_amount
+                            }
                         });
                         console.log(`User ${member.user_id} in chamaa ${member.chamaa_id} has insufficient balance. Available: ${member.available_balance}, Expected: ${member.expected_amount}`);
                     }
@@ -312,9 +316,13 @@ const processContributionJobs = async () => {
                         contributors: [...job.accounts_to_debit.map(member => member.user_id)],
                         recieving_user: job.user_id,
                         chamaa_id: job.chamaa_id,
+                        cycle_id: job.cycle_id,
                         message: `Contribution for cycle ${job.cycle_id} has been processed successfully. Amount: ${job.amount_per_member}`
                     }
-                    await RedisQueues.addToQueue(sms_notification_queue, notification_payload);
+                    await RedisQueues.addToQueue(sms_notification_queue, {
+                        type: 'financial_reminder',
+                        data: {...notification_payload}
+                    });
                     console.log('Sent notification to users about the contribution status:', notification_payload);
                     
                     //Add to the processed cycles set to avoid re-processing the same cycle on the same day

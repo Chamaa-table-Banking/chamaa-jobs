@@ -3,17 +3,20 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node ./deposits/index.js"
+    "start": "node ./deposits/index.js & node ./contributions/index.js & node ./sms/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "africastalking": "^0.7.4",
     "axios": "^1.13.4",
     "dotenv": "^17.2.4",
     "ioredis": "^5.9.2",
-    "p-limit": "^7.3.0"
+    "p-limit": "^7.3.0",
+    "pg": "^8.20.0"
   }
 }
