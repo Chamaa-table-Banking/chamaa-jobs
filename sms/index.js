@@ -11,6 +11,7 @@ const cycle_info_api = `${process.env.gateway}/api/v1/cycles/`;
 const POLL_INTERVAL_MS = parseInt(1500); // Default 15 seconds
 const sms_notification_queue = "queue:sms:notifications";
 const sms_response_queue = "queue:sms:responses";
+const sms_notification_queue_failed = "queue:sms:notifications:failed";
 const today = new Date().toISOString().split('T')[0];
 console.log('Worker configuration:', {
     user_info_api,
@@ -38,7 +39,7 @@ const credentials = {
     username: process.env.username,      // use 'sandbox' for development in the test environment
 };
 const sms = AfricasTalking(credentials);
-const sendSMS = async (phoneNumber, message) => {
+const sendSMS = async (phoneNumber, message, chamaa_id, user_id, type) => {
     try {
         const options = {
             to: [phoneNumber],
@@ -48,12 +49,18 @@ const sendSMS = async (phoneNumber, message) => {
         console.log('Sending SMS with options:', options);
         let response = await sms.SMS.send(options);
         response.Recipients[0].message = message;
+        response.Recipients[0].chamaa_id = chamaa_id;
+        response.Recipients[0].user_id = user_id;
+        response.Recipients[0].type = type;
+
         console.log('SMS sent successfully:', response);
     
         
         await RedisQueues.addToQueue(sms_response_queue, JSON.stringify(response));
     } catch (error) {
         console.error('Error sending SMS:', error);
+        // Add the notification to the failed queue
+        await RedisQueues.addToQueue(sms_notification_queue_failed, JSON.stringify(notification));
     }
 };
 const getChamaaInfo = async (chamaaId) => {
@@ -88,8 +95,8 @@ const insertTOSmsDatabase = async (sms) => {
     try {
             const query = `
             INSERT INTO sms
-            (cost, receipient, messageid, status, message, status_code,type)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            (cost, receipient, messageid, status, message, status_code,type, chamaa_id, user_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             `;
             const values = [
             sms.cost,
@@ -98,7 +105,9 @@ const insertTOSmsDatabase = async (sms) => {
             sms.status,
             sms.message,
             sms.statusCode,
-            sms.type || 'response'
+            sms.type || 'response',
+            sms.chamaa_id,
+            sms.user_id
             ];
 
         await client.query(query, values);
@@ -152,14 +161,14 @@ const processSMSNotifications = async () => {
                         type: notification.type, data: notification, cycleInfo, chamaaInfo, userInfo
                     });
                     message.type = notification.type;
-                    await sendSMS(userInfo.phone_number, message);
+                    await sendSMS(userInfo.phone_number, message, notification.chamaa_id, notification.user_id, notification.type);
                 } else {
                     console.error('Failed to fetch necessary information for SMS notification:', {
                         chamaaInfo,
                         cycleInfo,
                         userInfo
                     });
-                    await RedisQueues.addToQueue(sms_notification_queue, JSON.stringify(notification));
+                 await RedisQueues.addToQueue(sms_notification_queue_failed, JSON.stringify(notification));
 
 
                 }
@@ -190,17 +199,12 @@ const processSMSResponses = async () => {
                     messageId: recipient.messageId,
                     status: recipient.status,
                     message: response.message,
-                    statusCode: recipient.statusCode
+                    statusCode: recipient.statusCode,
+                    type: recipient.type,
+                    chamaa_id: recipient.chamaa_id,
+                    user_id: recipient.user_id,
+
                 }
-                const samplePayload = {
-                    cost:1.6000,
-                    receipient: '+254750516545',
-                    messageId: 'ATXid_78bdb89df9d528291226f2e1b3359391',
-                    status: 'Success',
-                    message:  "Hello! Lutali, we hope you're doing well. This is a reminder that your contribution of 300 for cycle Test Cycle in Test Chamaa is due on 2024-07-15. Please make sure to contribute on time to avoid any penalties. Thank you!",
-                    statusCode: 100
-                    }
-                console.log('Processing SMS response:', samplePayload);
                 await insertTOSmsDatabase(payload);
             }
         }
